@@ -24,7 +24,7 @@ else()
 endif()
 
 set(INSTALL_LIB_DIR lib${LIBSUFFIX} CACHE PATH "Installation directory for libraries")
-makr_as_advanced(INSTALL_LIB_DIR)
+mark_as_advanced(INSTALL_LIB_DIR)
 
 configure_file (
     "${PROJECT_SOURCE_DIR}/src/scep.h.in"
