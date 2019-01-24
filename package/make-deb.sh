@@ -25,15 +25,19 @@ pkgdeps="git-core dh-make cmake openssl pkg-config check liburiparser1 liburipar
 missingdeps=
 
 for i in $pkgdeps; do
-    if ! dpkg -l $i >/dev/null 2>&1; then
+    echo "DEBUG: check whether package '$i' is installed..."
+    if ! dpkg -s $i >/dev/null 2>&1; then
+        echo "DEBUG: adding $i to missing deps"
         missingdeps="$missingdeps $i"
+    else
+        echo "DEBUG: $i already installed"
     fi
 done
 
 if [ -n "$missingdeps" ]; then
     echo "INFO: Installing missing dependencies: $missingdeps"
-    sudo aptitude update
-    sudo aptitude install -y $missingdeps
+    sudo apt-get update
+    sudo apt-get install -y $missingdeps
 fi
 
 # Confirm the dependencies were actually installed...
