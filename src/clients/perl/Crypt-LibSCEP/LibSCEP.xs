@@ -15,19 +15,38 @@ IMPORTANT: This is only for cleanup purposes at the end!
 
 void
 create_err_msg(Conf *config) {
-	char *error = NULL;
+	char *tmp = NULL;
+	char error[4096];
+	
 	if(config) {
-		ERR_print_errors(config->handle->configuration->log);
-		(void)BIO_flush(config->handle->configuration->log);
-		BIO_get_mem_data(config->handle->configuration->log, &error);
-		(void)BIO_set_close(config->handle->configuration->log, BIO_NOCLOSE);
-		if(config->cleanup) {
-			BIO_free(config->handle->configuration->log);
-			scep_cleanup(config->handle);
-		}
-		free(config);
+	  if (! config->handle)
+	    Perl_croak(aTHX_ "*** Internal error: missing config handle");
+	  
+	  if (! config->handle->configuration)
+	    Perl_croak(aTHX_ "*** Internal error: missing config handle configuration");
+
+	  if (! config->handle->configuration->log)
+	    Perl_croak(aTHX_ "*** Internal error: missing config log BIO");
+
+	  ERR_print_errors(config->handle->configuration->log);
+	  (void)BIO_flush(config->handle->configuration->log);
+	  BIO_get_mem_data(config->handle->configuration->log, &tmp);
+	  if (tmp) {
+	    memset(error, 0, 4096);
+	    strncpy(error, tmp, 4095);
+	  }
+	  
+	  (void)BIO_set_close(config->handle->configuration->log, BIO_NOCLOSE);
+	  if(config->cleanup) {
+	    BIO_free(config->handle->configuration->log);
+	    scep_cleanup(config->handle);
+	  }
+	  //free(config);
 	}
-	Perl_croak(aTHX_ error);
+	if (error)
+	  Perl_croak(aTHX_ error);
+	else
+	  Perl_croak(aTHX_ "*** Internal error: no error message");
 }
 
 SV*
@@ -251,6 +270,13 @@ load_engine(SV *rv_engine_conf, Conf *config) {
 EVP_PKEY *load_key(char *key_str, Conf *config) {
 	EVP_PKEY *key = NULL;
 	BIO *b;
+	
+	if (! config)
+	  Perl_croak(aTHX_ "*** Internal error: missing config");
+	  
+	if (! config->handle->configuration)
+	  Perl_croak(aTHX_ "*** Internal error: missing config handle configuration");
+	
 	if(config->handle->configuration->engine == NULL) {
 		b = BIO_new(BIO_s_mem());
 		if(b == NULL) {
@@ -307,6 +333,12 @@ EVP_PKEY *load_key(char *key_str, Conf *config) {
 X509_CRL *
 str2crl (Conf *config, char *str, BIO *b) {
 	X509_CRL *c = NULL;
+	if (! config)
+	  Perl_croak(aTHX_ "*** Internal error: missing config");
+	  
+	if (! config->handle)
+	  Perl_croak(aTHX_ "*** Internal error: missing config handle");
+	
 	if(BIO_write(b, str, strlen(str)) <= 0) {
 		scep_log(config->handle, ERROR, "Could not write CRL to BIO");
 		BIO_free(b);
@@ -325,6 +357,12 @@ str2crl (Conf *config, char *str, BIO *b) {
 X509_REQ *
 str2req (Conf *config, char *str, BIO *b) {
 	X509_REQ *c = NULL;
+	if (! config)
+	  Perl_croak(aTHX_ "*** Internal error: missing config");
+	  
+	if (! config->handle)
+	  Perl_croak(aTHX_ "*** Internal error: missing config handle");
+
 	if(BIO_write(b, str, strlen(str)) <= 0) {
 		scep_log(config->handle, ERROR, "Could not write REQ to BIO");
 		BIO_free(b);
@@ -344,6 +382,12 @@ str2req (Conf *config, char *str, BIO *b) {
 X509 *
 str2cert (Conf *config, char *str, BIO *b) {
 	X509 *c = NULL;
+	if (! config)
+	  Perl_croak(aTHX_ "*** Internal error: missing config");
+	  
+	if (! config->handle)
+	  Perl_croak(aTHX_ "*** Internal error: missing config handle");
+
 	if(BIO_write(b, str, strlen(str)) <= 0) {
 		scep_log(config->handle, ERROR, "Could not write cert to BIO");
 		BIO_free(b);
@@ -372,6 +416,12 @@ str2cert (Conf *config, char *str, BIO *b) {
 PKCS7 *
 str2pkcs7 (Conf *config, char *str, BIO *b) {
 	PKCS7 *c = NULL;
+	if (! config)
+	  Perl_croak(aTHX_ "*** Internal error: missing config");
+	  
+	if (! config->handle)
+	  Perl_croak(aTHX_ "*** Internal error: missing config handle");
+
 	if(BIO_write(b, str, strlen(str)) <= 0) {
 		scep_log(config->handle, ERROR, "Could not write PKCS7 to BIO");
 		BIO_free(b);
@@ -389,6 +439,12 @@ str2pkcs7 (Conf *config, char *str, BIO *b) {
 
 STACK_OF(X509_INFO) *
 str2x509infos (Conf *config, char *str, BIO *b) {
+	if (! config)
+	  Perl_croak(aTHX_ "*** Internal error: missing config");
+	  
+	if (! config->handle)
+	  Perl_croak(aTHX_ "*** Internal error: missing config handle");
+
 	STACK_OF(X509_INFO) *c = NULL;
 		if(BIO_write(b, str, strlen(str)) <= 0) {
 		scep_log(config->handle, ERROR, "Could not write cert chain to BIO");
@@ -1511,6 +1567,10 @@ PREINIT:
 	SV *reply;
 	BIO *b;
 CODE:
+        if (! pkiMessage)
+	  Perl_croak(aTHX_ "Internal error: no pkiMessage");
+        if (! pkiMessage->request)
+	  Perl_croak(aTHX_ "Internal error: no request in pkiMessage");
 	req = pkiMessage->request;
 	reply = NULL;
 	b = BIO_new(BIO_s_mem());
