@@ -15,7 +15,7 @@ include (CheckTypeSize)
 
 # Version
 set (libscep_VERSION_MAJOR 0)
-set (libscep_VERSION_MINOR 0)
+set (libscep_VERSION_MINOR 04)
 
 if(LIB64)
     set(LIBSUFFIX 64)
