@@ -331,6 +331,9 @@ my $certrep_success_crl_unwrapped = Crypt::LibSCEP::unwrap($conf, $certrep_succe
 ok($certrep_success_crl_unwrapped ne "", "CertRep SUCCESS CRL unwrap");
 ok(Crypt::LibSCEP::get_crl($certrep_success_crl_unwrapped) eq $crl, "CertRep SUCCESS crl");
 
+#### my $certrep_success_crl = Crypt::LibSCEP::create_crl_reply($ca_conf2, $sig_cakey_enc, $sig_cacert, $getcrl, $crl);
+
+
 #Testing create_nextca_reply
 ok(Crypt::LibSCEP::create_nextca_reply($conf, $issuedCert . "\n" . $sig_cacert, $sig_cacert, $sig_cakey) ne "", "create_nextca_reply");
 
