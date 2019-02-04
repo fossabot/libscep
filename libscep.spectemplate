@@ -1,0 +1,78 @@
+Name:     libscep
+Version:  @VERSION@
+Release:  1
+Summary:  LibSCEP
+Group: System Environment/Libraries
+License:  GPLv3+
+#URL:      https://www.gnu.org/software/hello/   
+Source0:  libscep-@VERSION@.tar.gz
+BuildRoot: %{_tmppath}/%{name}-%{version}-build
+%define filelist %{name}-%{version}-filelist
+
+%description
+libscep
+
+%prep
+
+%setup -q
+
+%build
+echo "buildroot = %{buildroot}"
+mkdir build
+cd build
+cmake -D NOTEST=1 -D LIB64=1 -D BUILD_CLI=OFF -D CMAKE_INSTALL_LIBDIR=/usr/lib64 -D CMAKE_INSTALL_PREFIX=%{buildroot}/usr ..
+#./configure --disable-test --disable-doc --prefix=%{buildroot}/usr --libdir=%{buildroot}/usr/lib64
+make
+
+%install
+echo "buildroot = %{buildroot}"
+rm -rf %{buildroot}
+(cd build && make install)
+find %{buildroot}
+
+%{__perl} -MFile::Find -le '
+    find({ wanted => \&wanted, no_chdir => 1}, "%{buildroot}");
+    for my $x (sort @dirs, @files) {
+        push @ret, $x unless indirs($x);
+        }
+    print join "\n", sort @ret;
+
+    sub wanted {
+        return if /auto$/;
+
+        local $_ = $File::Find::name;
+        my $f = $_; s|^\Q%{buildroot}\E||;
+        return unless length;
+        return $files[@files] = $_ if (-f $f || -l $f);
+
+        $d = $_;
+        /\Q$d\E/ && return for reverse sort @INC;
+        $d =~ /\Q$_\E/ && return
+            #for qw|/etc %_prefix/man %_prefix/bin %_prefix/share /var |;
+            for qw| /etc /opt /usr /srv /var |;
+
+        $dirs[@dirs] = $_;
+        }
+
+    sub indirs {
+        my $x = shift;
+        $x =~ /^\Q$_\E\// && $x ne $_ && return 1 for @dirs;
+        }
+' > %filelist
+
+[ -z %filelist ] && {
+    echo "ERROR: empty %files listing"
+    exit -1
+    }
+
+ls -l %filelist
+pwd
+cat %filelist
+
+%files -f %filelist
+%defattr(-,root,root)
+
+%changelog
+* Wed Mar 14 2018 Scott Hardin <shardin@whiterabbitsecurity.com> - 0.8.5-1
+- Initial version of the package
+
