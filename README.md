@@ -29,6 +29,16 @@ Dependencies:
     make
     make test
 
+Version Bump
+-------------
+
+The major and monir version numbers are tracked in:
+
+    CMakeLists.txt
+    src/clients/perl/Crypt-LibSCEP/MYMETA.json
+    src/clients/perl/Crypt-LibSCEP/MYMETA.yml
+    src/clients/perl/Crypt-LibSCEP/lib/Crypt/LibSCEP.pm
+
 Building Debian Package
 ------------------------
 
