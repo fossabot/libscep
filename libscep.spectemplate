@@ -1,6 +1,6 @@
 Name:     libscep
 Version:  @VERSION@
-Release:  1
+Release:  @BUILD_NUMBER@
 Summary:  LibSCEP
 Group: System Environment/Libraries
 License:  GPLv3+
