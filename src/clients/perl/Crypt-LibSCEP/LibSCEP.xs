@@ -40,7 +40,7 @@ create_err_msg(Conf *config) {
             BIO_free(config->handle->configuration->log);
             scep_cleanup(config->handle);
         }
-        //free(config);
+        free(config);
     }
     if (error)
       Perl_croak(aTHX_ error);
