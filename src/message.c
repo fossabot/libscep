@@ -160,7 +160,6 @@ SCEP_ERROR scep_pkcsreq(
 	struct p7_data_t p7data = {0};
 	X509_NAME *subject;
 	char *subject_str = NULL;
-	int passwd_index;
 
 	subject = X509_REQ_get_subject_name(req);
 	if(!subject)
@@ -855,7 +854,11 @@ SCEP_ERROR scep_unwrap(
 		SCEP_ERR(SCEPE_INVALID_CONTENT, "messageType is missing. Not a pkiMessage?");
 
 	/* luckily, standard defines single types */
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	local_out->messageType_str = strdup((char *) ASN1_STRING_data(messageType->value.printablestring));
+#else
+	local_out->messageType_str = strdup((char *) ASN1_STRING_get0_data(messageType->value.printablestring));
+#endif	
 	if(!local_out->messageType_str)
 		SCEP_ERR(SCEPE_INVALID_CONTENT, "Failed to extract message type");
 
@@ -881,7 +884,11 @@ SCEP_ERROR scep_unwrap(
 	/* transaction ID */
 	if(!(transId = PKCS7_get_signed_attribute(si, handle->oids->transId)))
 		SCEP_ERR(SCEPE_INVALID_CONTENT, "transaction ID is missing");
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	local_out->transactionID = strdup((char *) ASN1_STRING_data(transId->value.printablestring));
+#else
+	local_out->transactionID = strdup((char *) ASN1_STRING_get0_data(transId->value.printablestring));
+#endif	
 	if(!local_out->transactionID)
 		OSSL_ERR("Failed to extract transaction ID as string");
 
