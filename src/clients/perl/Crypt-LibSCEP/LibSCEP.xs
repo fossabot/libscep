@@ -36,7 +36,6 @@ create_err_msg(Conf *config) {
             strncpy(error, tmp, 4095);
         }
 
-        (void)BIO_set_close(config->handle->configuration->log, BIO_NOCLOSE);
         if(config->cleanup) {
             BIO_free(config->handle->configuration->log);
             scep_cleanup(config->handle);
