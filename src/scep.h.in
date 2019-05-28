@@ -172,8 +172,8 @@ struct engine_params_t {
 
 typedef struct {
     SCEP_VERBOSITY verbosity;
-    EVP_MD *sigalg;
-    EVP_CIPHER *encalg;
+    const EVP_MD *sigalg;
+    const EVP_CIPHER *encalg;
     BIO *log;
     SCEP_FLAGS flags;
 #ifndef OPENSSL_NO_ENGINE
