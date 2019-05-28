@@ -1839,8 +1839,7 @@ CODE:
         EVP_PKEY_free(sig_key);
         X509_free(sig_cert);
         PKCS7_free(getcrl);
-        /*crl will be freed by SCEP_DATA_free in message.c*/
-        //X509_CRL_free(crl);
+        X509_CRL_free(crl);
         BIO_free(b);
         if(!success) {
             create_err_msg(config);
