@@ -9,12 +9,21 @@ Vagrant.configure("2") do |config|
   # The most common configuration options are documented and commented below.
   # For a complete reference, please see the online documentation at
   # https://docs.vagrantup.com.
-
-  # Every Vagrant development environment requires a box. You can search for
-  # boxes at https://atlas.hashicorp.com/search.
-  config.vm.box = "debian/contrib-jessie64"
-  #config.vm.box = "debian/contrib-stretch64"
-  #config.vm.box = "mrscotty/sles11-oxibuild"
+  config.vm.define "default", primary:true do |default|
+    # Every Vagrant development environment requires a box. You can search for
+    # boxes at https://atlas.hashicorp.com/search.
+    config.vm.box = "debian/contrib-jessie64"
+    #config.vm.box = "debian/contrib-stretch64"
+    #config.vm.box = "mrscotty/sles11-oxibuild"
+    #config.vm.box = "generic/freebsd12"
+  end
+  config.vm.define "freebsd", primary:false do |freebsd|
+    config.vm.box = "generic/freebsd12"
+  end
+  config.vm.define "buster", primary:false do |buster|
+    config.vm.box = "debian/contrib-buster64"
+    config.vm.provision :shell, :path => "provision-buster.sh"
+  end
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
