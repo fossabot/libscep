@@ -83,6 +83,7 @@ init_config(SV *rv_config) {
     config->cleanup = FALSE;
     config->passin = "plain";
     config->passwd = "";
+    config->handle = NULL;
 
     if (SvROK(rv_config) && (SvTYPE(SvRV(rv_config)) == SVt_PVHV)) {
         HV *hv_config = (HV*)SvRV(rv_config);
