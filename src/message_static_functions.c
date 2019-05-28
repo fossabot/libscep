@@ -144,7 +144,11 @@ static SCEP_ERROR handle_certrep_attributes(
     ASN1_TYPE *pkiStatus = PKCS7_get_signed_attribute(si, handle->oids->pkiStatus);
     if(!pkiStatus)
         SCEP_ERR(SCEPE_INVALID_CONTENT, "pkiStatus is missing");
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
     char *pki_status_str = (char *) ASN1_STRING_data(pkiStatus->value.printablestring);
+#else
+    char *pki_status_str = (char *) ASN1_STRING_get0_data(pkiStatus->value.printablestring);
+#endif
     if(strncmp(pki_status_str, SCEP_PKISTATUS_SUCCESS, sizeof(SCEP_PKISTATUS_SUCCESS)) == 0)
         data->pkiStatus = SCEP_SUCCESS;
     else if(strncmp(pki_status_str, SCEP_PKISTATUS_FAILURE, sizeof(SCEP_PKISTATUS_FAILURE)) == 0)
@@ -160,7 +164,11 @@ static SCEP_ERROR handle_certrep_attributes(
         ASN1_TYPE *failInfo = PKCS7_get_signed_attribute(si, handle->oids->failInfo);
         if(!failInfo)
             SCEP_ERR(SCEPE_INVALID_CONTENT, "failInfo is missing");
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
         char *failInfo_str = (char *) ASN1_STRING_data(failInfo->value.printablestring);
+#else
+        char *failInfo_str = (char *) ASN1_STRING_get0_data(failInfo->value.printablestring);
+#endif	
         if(strncmp(failInfo_str, SCEP_BAD_ALG_NR, sizeof(SCEP_BAD_ALG_NR)) == 0)
             data->failInfo = SCEP_BAD_ALG;
         else if(strncmp(failInfo_str, SCEP_BAD_MESSAGE_CHECK_NR, sizeof(SCEP_BAD_MESSAGE_CHECK_NR)) == 0)
@@ -246,6 +254,7 @@ static SCEP_ERROR handle_encrypted_content(
 
 	      /* extract challenge password */
 	      X509_ATTRIBUTE *attr = X509_REQ_get_attr(data->request, passwd_index);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	      if(attr->single == 0) { // set
                 if(sk_ASN1_TYPE_num(attr->value.set) != 1)
 		  SCEP_ERR(SCEPE_UNHANDLED, "Unexpected number of elements in challenge password");
@@ -253,6 +262,15 @@ static SCEP_ERROR handle_encrypted_content(
 	      } else { // single
                 data->challenge_password = attr->value.single;
 	      }
+#else
+	      ASN1_TYPE *ext = NULL;
+	      ext = X509_ATTRIBUTE_get0_type(attr, 0);
+	      if (ext->type == V_ASN1_SET) {
+                if(X509_ATTRIBUTE_count(attr) != 1)
+		  SCEP_ERR(SCEPE_UNHANDLED, "Unexpected number of elements in challenge password");
+	      }
+	      data->challenge_password = X509_ATTRIBUTE_get0_type(attr, 0);
+#endif	      
 	    } else {
 	      data->challenge_password = NULL;
 	    }

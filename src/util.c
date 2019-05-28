@@ -304,7 +304,15 @@ finally:
 
 int X509_REQ_cmp(X509_REQ *req1, X509_REQ *req2)
 {
-	return ASN1_STRING_cmp(req1->signature, req2->signature);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  return ASN1_STRING_cmp(req1->signature, req2->signature);
+#else
+  const ASN1_BIT_STRING *sig1 = NULL;
+  const ASN1_BIT_STRING *sig2 = NULL;
+  X509_REQ_get0_signature(req1, &sig2, NULL);
+  X509_REQ_get0_signature(req2, &sig2, NULL);
+  return ASN1_STRING_cmp(sig1, sig2);
+#endif
 }
 
 ASN1_SEQUENCE(PKCS7_ISSUER_AND_SUBJECT) = {
