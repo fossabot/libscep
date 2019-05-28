@@ -6,51 +6,83 @@
 
 #include "scep.h"
 #include <stdlib.h>
+#include <string.h>
 #include "config.h"
 #include <openssl/x509v3.h>
-/*
-Puts the error log to a string and frees config.
-IMPORTANT: This is only for cleanup purposes at the end!
-*/
 
+// (try and) free all memory
 void
-create_err_msg(Conf *config) {
+cleanup_config(Conf *config) {
+    if (! config) return;
+
+    // only free SCEP* handle if we created it (i.e. was not passed in from Perl code)
+    if (config->handle_autocreated && config->handle) {
+        if (config->handle->configuration && config->handle->configuration->log)
+            BIO_free(config->handle->configuration->log);
+
+        scep_cleanup(config->handle);
+    }
+
+    free(config);
+}
+
+/*
+Puts the OpenSSL error log to a string and frees config.
+IMPORTANT: This is only for cleanup purposes at the end!
+
+additional_msg might be NULL.
+*/
+void
+create_err_msg(Conf *config, char *additional_msg) {
     char *tmp = NULL;
     char error[4096];
+    long loglen;
 
-    if(config) {
-        if (! config->handle)
-          Perl_croak(aTHX_ "*** Internal error: missing member (SCEP*)handle in 'config'");
-
-        if (! config->handle->configuration)
-          Perl_croak(aTHX_ "*** Internal error: missing member (SCEP_CONFIGURATION*)configuration in config->handle");
-
-        if (! config->handle->configuration->log)
-          Perl_croak(aTHX_ "*** Internal error: missing member (BIO*)log in config->handle->configuration");
-
-        ERR_print_errors(config->handle->configuration->log);
-        (void)BIO_flush(config->handle->configuration->log);
-
-        /* read log data if we were logging to memory
-           i.e.: if there is a BIO_TYPE_MEM somewhere in the BIO chain */
-        if (BIO_find_type(config->handle->configuration->log, BIO_TYPE_MEM) != NULL) {
-            BIO_get_mem_data(config->handle->configuration->log, &tmp);
-            if (tmp) {
-                memset(error, 0, 4096);
-                strncpy(error, tmp, 4095);
-            }
-        }
-
-        if (config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
-        free(config);
+    if (additional_msg) {
+        OPENSSL_strlcpy(error, additional_msg, 4096);
+        OPENSSL_strlcat(error, "\n", 4096);
     }
-    if (error)
-      Perl_croak(aTHX_ error);
-    else
-      Perl_croak(aTHX_ "*** Internal error: no error message");
+    else {
+        OPENSSL_strlcpy(error, "", 4096);
+    }
+
+    if (! config) {
+        OPENSSL_strlcat(error, "*** Internal error: 'config' is not set", 4096);
+        goto cleanup_and_croak;
+    }
+    if (! config->handle) {
+        OPENSSL_strlcat(error, "*** Internal error: missing member (SCEP*)handle in 'config'", 4096);
+        goto cleanup_and_croak;
+    }
+    if (! config->handle->configuration) {
+        OPENSSL_strlcat(error, "*** Internal error: missing member (SCEP_CONFIGURATION*)configuration in config->handle", 4096);
+        goto cleanup_and_croak;
+    }
+    if (! config->handle->configuration->log) {
+        OPENSSL_strlcat(error, "*** Internal error: missing member (BIO*)log in config->handle->configuration", 4096);
+        goto cleanup_and_croak;
+    }
+
+    // Flush all OpenSSL errors into the log BIO
+    ERR_print_errors(config->handle->configuration->log);
+    (void)BIO_flush(config->handle->configuration->log);
+
+    /* read log data if we were logging to memory
+       i.e.: if there is a BIO_TYPE_MEM somewhere in the BIO chain */
+    if (BIO_find_type(config->handle->configuration->log, BIO_TYPE_MEM) != NULL) {
+        loglen = BIO_get_mem_data(config->handle->configuration->log, &tmp);
+        if (loglen > 0) {
+            // copy at most 4096 bytes from the memory BIO (ensuring a trailing \0)
+            OPENSSL_strlcat(error, tmp, 4096);
+        }
+    }
+
+cleanup_and_croak:
+    cleanup_config(config);
+
+    if (strlen(error) == 0)
+        OPENSSL_strlcpy(error, "*** Internal error: no error message", 4096);
+    Perl_croak(aTHX_ error);
 }
 
 SV*
@@ -76,73 +108,72 @@ init_config(SV *rv_config) {
     SCEP_ERROR s;
     BIO *scep_log = NULL;
     Conf *config = malloc(sizeof(Conf));
-    if(config == NULL) {
-        goto err;
-    }
+    if (config == NULL)
+        Perl_croak(aTHX_ "Memory allocation failure for config");
 
-    config->cleanup = FALSE;
     config->passin = "plain";
     config->passwd = "";
     config->handle = NULL;
+    config->handle_autocreated = FALSE;
 
     if (SvROK(rv_config) && (SvTYPE(SvRV(rv_config)) == SVt_PVHV)) {
         HV *hv_config = (HV*)SvRV(rv_config);
         SV **svv;
         svv = hv_fetch(hv_config, "handle", strlen("handle"),FALSE);
+        // use pre-existing SCEP* handle passed in from Perl code
         if(svv) {
             SV *sv;
             if(SvROK(*svv)) {
                 sv = SvRV(*svv);
             }
             else {
-                goto err;
+                create_err_msg(config, "Configuration parameter 'handle' is not a valid reference");
             }
             size_t s = SvIV(sv);
             config->handle = INT2PTR(SCEP*, s);
         }
+        // initialize new SCEP* handle
         else {
             s = scep_init(&config->handle);
             if (s != SCEPE_OK) {
-                goto err;
+                create_err_msg(config, "Could not create SCEP handle");
             }
-            config->cleanup = TRUE;
+            config->handle_autocreated = TRUE; // so we know we can destroy it later on
+
             svv = hv_fetch(hv_config, "log", strlen("log"),FALSE);
             if(svv) {
                 char *md = SvPV_nolen(*svv);
                 scep_log = BIO_new_file(md, "a");
-                if(!scep_log) {
-                    Perl_croak(aTHX_ "Could not create log file %s", md);
-                }
-                if (s != SCEPE_OK) {
-                    goto err;
+                if(scep_log == NULL) {
+                    create_err_msg(config, "Could not create log file");
                 }
             }
             else {
                 scep_log = BIO_new(BIO_s_mem());
                 if(scep_log == NULL) {
-                    goto err;
+                    create_err_msg(config, "Could not create log buffer");
                 }
             }
             //cannot fail but we want to tolerate changes of scep_conf_set
             s = scep_conf_set(config->handle, SCEPCFG_LOG, scep_log);
             if (s != SCEPE_OK) {
-                goto err;
+                create_err_msg(config, "Could set log buffer");
             }
             s = scep_conf_set(config->handle, SCEPCFG_VERBOSITY, DEBUG);
             if (s != SCEPE_OK) {
-                goto err;
+                create_err_msg(config, "Could set log verbosity");
             }
         }
         svv = hv_fetch(hv_config, "passin", strlen("passin"),FALSE);
-        if(svv) {
+        if (svv) {
             config->passin = SvPV_nolen(*svv);
         }
         svv = hv_fetch(hv_config, "sigalg", strlen("sigalg"),FALSE);
-        if(svv) {
+        if (svv) {
             char *md = SvPV_nolen(*svv);
             if(!(config->handle->configuration->sigalg = EVP_get_digestbyname(md))) {
                 scep_log(config->handle, ERROR, "Could not set digest");
-                goto err;
+                create_err_msg(config, NULL);
             }
         }
         svv = hv_fetch(hv_config, "encalg", strlen("encalg"),FALSE);
@@ -150,11 +181,11 @@ init_config(SV *rv_config) {
             char *encalg = SvPV_nolen(*svv);
             if(!(config->handle->configuration->encalg = EVP_get_cipherbyname(encalg))) {
                 scep_log(config->handle, ERROR, "Could not set cipher");
-                goto err;
+                create_err_msg(config, NULL);
             }
         }
         svv = hv_fetch(hv_config, "passwd", strlen("passwd"),FALSE);
-        if(svv) {
+        if (svv) {
             config->passwd = SvPV_nolen(*svv);
         }
     }
@@ -164,19 +195,6 @@ init_config(SV *rv_config) {
     }
     SV *reply = INT2PTR(SV*, PTR2IV(config));
     return reply;
-err:
-    if(scep_log) {
-        ERR_print_errors(scep_log);
-        create_err_msg(config);
-    }
-    if(config) {
-        if(config->cleanup) {
-            scep_cleanup(config->handle);
-        }
-        free(config);
-        Perl_croak(aTHX_ "Could not create error log or scep handle. Configuration parameter damaged?");
-    }
-    Perl_croak(aTHX_ "Memory allocation failure for config");
 }
 
 /*adds an engine to the handle according to config */
@@ -185,7 +203,7 @@ load_engine(SV *rv_engine_conf, Conf *config) {
     Engine_conf *engine_config = malloc(sizeof(Engine_conf));
     if(engine_config == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error for engine_conf");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     if (SvROK(rv_engine_conf) && (SvTYPE(SvRV(rv_engine_conf)) == SVt_PVHV)) {
         SCEP_ERROR s;
@@ -269,24 +287,24 @@ load_engine(SV *rv_engine_conf, Conf *config) {
     }
     err:return;
         free(engine_config);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
 }
 
 EVP_PKEY *load_key(char *key_str, Conf *config) {
     EVP_PKEY *key = NULL;
-    BIO *b;
+    BIO *b = NULL;
 
     if (! config)
       Perl_croak(aTHX_ "*** Internal error: missing config");
 
-    if (! config->handle->configuration)
-      Perl_croak(aTHX_ "*** Internal error: missing config handle configuration");
+    if (! (config->handle && config->handle->configuration))
+      create_err_msg(config, "*** Internal error: missing config handle configuration");
 
     if(config->handle->configuration->engine == NULL) {
         b = BIO_new(BIO_s_mem());
         if(b == NULL) {
             scep_log(config->handle, ERROR, "Memory allocation failure for BIO");
-            create_err_msg(config);
+            create_err_msg(config, NULL);
         }
         if(!BIO_write(b, key_str, strlen(key_str))) {
             scep_log(config->handle, ERROR, "Could not write to BIO");
@@ -324,14 +342,14 @@ EVP_PKEY *load_key(char *key_str, Conf *config) {
         //we got an engine
         if(!(key = ENGINE_load_private_key(config->handle->configuration->engine, key_str, NULL, NULL))) {
             scep_log(config->handle, ERROR, "Loading private key from engine failed");
-            create_err_msg(config);
+            create_err_msg(config, NULL);
         }
     }
     return key;
     err:
         BIO_free(b);
         EVP_PKEY_free(key);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     return NULL;
 }
 
@@ -342,18 +360,18 @@ str2crl (Conf *config, char *str, BIO *b) {
       Perl_croak(aTHX_ "*** Internal error: missing config");
 
     if (! config->handle)
-      Perl_croak(aTHX_ "*** Internal error: missing config handle");
+      create_err_msg(config, "*** Internal error: missing config handle");
 
     if(BIO_write(b, str, strlen(str)) <= 0) {
         scep_log(config->handle, ERROR, "Could not write CRL to BIO");
         BIO_free(b);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     c = PEM_read_bio_X509_CRL(b, NULL, 0, 0);
     if(c == NULL) {
         scep_log(config->handle, ERROR, "Could not read CRL");
         BIO_free(b);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     (void)BIO_reset(b);
     return c;
@@ -366,18 +384,18 @@ str2req (Conf *config, char *str, BIO *b) {
       Perl_croak(aTHX_ "*** Internal error: missing config");
 
     if (! config->handle)
-      Perl_croak(aTHX_ "*** Internal error: missing config handle");
+      create_err_msg(config, "*** Internal error: missing config handle");
 
     if(BIO_write(b, str, strlen(str)) <= 0) {
         scep_log(config->handle, ERROR, "Could not write REQ to BIO");
         BIO_free(b);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     c = PEM_read_bio_X509_REQ(b, NULL, 0, 0);
     if(c == NULL) {
         scep_log(config->handle, ERROR, "Could not read REQ");
         BIO_free(b);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     (void)BIO_reset(b);
     return c;
@@ -391,18 +409,18 @@ str2cert (Conf *config, char *str, BIO *b) {
       Perl_croak(aTHX_ "*** Internal error: missing config");
 
     if (! config->handle)
-      Perl_croak(aTHX_ "*** Internal error: missing config handle");
+      create_err_msg(config, "*** Internal error: missing config handle");
 
     if(BIO_write(b, str, strlen(str)) <= 0) {
         scep_log(config->handle, ERROR, "Could not write cert to BIO");
         BIO_free(b);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     c = PEM_read_bio_X509(b, NULL, 0, 0);
     if(c == NULL) {
         scep_log(config->handle, ERROR, "Could not read cert");
         BIO_free(b);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     /*Snippet that could be used to verify certificate purpose*/
@@ -425,18 +443,18 @@ str2pkcs7 (Conf *config, char *str, BIO *b) {
       Perl_croak(aTHX_ "*** Internal error: missing config");
 
     if (! config->handle)
-      Perl_croak(aTHX_ "*** Internal error: missing config handle");
+      create_err_msg(config, "*** Internal error: missing config handle");
 
     if(BIO_write(b, str, strlen(str)) <= 0) {
         scep_log(config->handle, ERROR, "Could not write PKCS7 to BIO");
         BIO_free(b);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     c = PEM_read_bio_PKCS7(b, NULL, 0, 0);
     if(c == NULL) {
         scep_log(config->handle, ERROR, "Could not read PKCS7");
         BIO_free(b);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     (void)BIO_reset(b);
     return c;
@@ -448,19 +466,19 @@ str2x509infos (Conf *config, char *str, BIO *b) {
       Perl_croak(aTHX_ "*** Internal error: missing config");
 
     if (! config->handle)
-      Perl_croak(aTHX_ "*** Internal error: missing config handle");
+      create_err_msg(config, "*** Internal error: missing config handle");
 
     STACK_OF(X509_INFO) *c = NULL;
         if(BIO_write(b, str, strlen(str)) <= 0) {
         scep_log(config->handle, ERROR, "Could not write cert chain to BIO");
         BIO_free(b);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     c = PEM_X509_INFO_read_bio(b, NULL, NULL, NULL);
     if(c == NULL) {
         scep_log(config->handle, ERROR, "Could not read signer infos from cert chain");
         BIO_free(b);
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     (void)BIO_reset(b);
     return c;
@@ -513,7 +531,7 @@ CODE:
 
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -551,21 +569,17 @@ CODE:
 
     success = TRUE;
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
         sk_X509_INFO_pop_free(X509Infos, X509_INFO_free);
         sk_X509_pop_free(certs, X509_free);
         X509_free(sig_cert);
         X509_free(enc_cert);
         X509_free(issuedCert);
         EVP_PKEY_free(sig_key);
-        free(config);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
 
     RETVAL = reply;
 OUTPUT:
@@ -609,7 +623,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert(config, sig_cert_str, b);
@@ -664,21 +678,17 @@ CODE:
 
     success = TRUE;
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
         sk_X509_INFO_pop_free(X509Infos, X509_INFO_free);
         sk_X509_pop_free(certs, X509_free);
-        free(config);
         X509_free(sig_cert);
         X509_free(issuedCert);
         EVP_PKEY_free(sig_key);
         PKCS7_free(pkcsreq);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = reply;
 OUTPUT:
     RETVAL
@@ -715,7 +725,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
     sig_cert = str2cert (config, sig_cert_str, b);
     pkcsreq = str2pkcs7(config, pkcsreq_str, b);
@@ -755,18 +765,14 @@ CODE:
     success = TRUE;
 
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
         EVP_PKEY_free(sig_key);
-        free(config);
         PKCS7_free(pkcsreq);
         X509_free(sig_cert);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = reply;
 OUTPUT:
     RETVAL
@@ -800,7 +806,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -834,17 +840,13 @@ CODE:
 
     success = TRUE;
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
         EVP_PKEY_free(sig_key);
         X509_free(sig_cert);
-        free(config);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = reply;
 OUTPUT:
     RETVAL
@@ -875,7 +877,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -895,17 +897,13 @@ CODE:
     success = TRUE;
 
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
-        free(config);
         EVP_PKEY_free(sig_key);
         X509_free(sig_cert);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = reply;
 OUTPUT:
     RETVAL
@@ -939,7 +937,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -965,18 +963,14 @@ CODE:
     success = TRUE;
 
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
         EVP_PKEY_free(sig_key);
         X509_free(sig_cert);
         PKCS7_free(pkcsreq);
-        free(config);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = reply;
 OUTPUT:
     RETVAL
@@ -1007,7 +1001,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -1034,14 +1028,10 @@ CODE:
         X509_free(sig_cert);
         X509_free(enc_cert);
         X509_REQ_free(req);
-        if(!success) {
-            create_err_msg(config);
-        }
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
-        free(config);
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = reply;
 OUTPUT:
     RETVAL
@@ -1077,7 +1067,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -1113,20 +1103,16 @@ CODE:
     success = TRUE;
 
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
         ASN1_INTEGER_free(serial);
-        free(config);
         X509_free(sig_cert);
         X509_free(enc_cert);
         X509_free(cacert);
         EVP_PKEY_free(sig_key);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = reply;
 OUTPUT:
     RETVAL
@@ -1169,7 +1155,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     pkiMessage = str2pkcs7(config, pkiMessage_str, b);
@@ -1182,16 +1168,12 @@ CODE:
     success = TRUE;
 
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
-        free(config);
         PKCS7_free(pkiMessage);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = unwrapped;
 OUTPUT:
     RETVAL
@@ -1222,7 +1204,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -1240,19 +1222,15 @@ CODE:
     }
     success = TRUE;
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
-        free(config);
         X509_free(sig_cert);
         X509_free(enc_cert);
         PKCS7_free(pkiMessage);
         BIO_free(b);
         EVP_PKEY_free(enc_key);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = unwrapped;
 OUTPUT:
     RETVAL
@@ -1266,11 +1244,7 @@ PREINIT:
 CODE:
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
     load_engine(rv_engine_conf, config);
-    if(config->cleanup) {
-        BIO_free(config->handle->configuration->log);
-        scep_cleanup(config->handle);
-    }
-    free(config);
+    cleanup_config(config);
 
 SV *
 get_transaction_id(pkiMessage)
@@ -1471,7 +1445,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_key = load_key(sig_key_str, config);
@@ -1510,19 +1484,15 @@ CODE:
     success = TRUE;
 
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
         sk_X509_INFO_pop_free(X509Infos, X509_INFO_free);
         EVP_PKEY_free(sig_key);
         sk_X509_pop_free(certs, X509_free);
-        free(config);
         X509_free(sig_cert);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
 
     RETVAL = reply;
 OUTPUT:
@@ -1654,7 +1624,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -1677,20 +1647,16 @@ CODE:
     success = TRUE;
 
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
         X509_REQ_free(req);
         EVP_PKEY_free(sig_key);
-        free(config);
         X509_free(sig_cert);
         X509_free(issuer_cert);
         X509_free(enc_cert);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = reply;
 OUTPUT:
     RETVAL
@@ -1723,7 +1689,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -1745,19 +1711,15 @@ CODE:
     success = TRUE;
 
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
         EVP_PKEY_free(sig_key);
-        free(config);
         X509_free(sig_cert);
         X509_free(enc_cert);
         X509_free(validate_cert);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = reply;
 OUTPUT:
     RETVAL
@@ -1795,7 +1757,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -1831,19 +1793,15 @@ CODE:
 
     success = TRUE;
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
-        free(config);
         EVP_PKEY_free(sig_key);
         X509_free(sig_cert);
         PKCS7_free(getcrl);
         X509_CRL_free(crl);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
     RETVAL = reply;
 OUTPUT:
     RETVAL
@@ -1884,7 +1842,7 @@ CODE:
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
-        create_err_msg(config);
+        create_err_msg(config, NULL);
     }
 
     sig_cert = str2cert (config, sig_cert_str, b);
@@ -1906,19 +1864,15 @@ CODE:
 
     success = TRUE;
     err:
-        if(config->cleanup) {
-            BIO_free(config->handle->configuration->log);
-            scep_cleanup(config->handle);
-        }
-        free(config);
         X509_free(sig_cert);
         X509_free(enc_cert);
         EVP_PKEY_free(sig_key);
         X509_CRL_free(crl);
         BIO_free(b);
-        if(!success) {
-            create_err_msg(config);
-        }
+        if (success)
+            cleanup_config(config);
+        else
+            create_err_msg(config, NULL);
 
     RETVAL = reply;
 OUTPUT:
