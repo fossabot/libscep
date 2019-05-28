@@ -30,13 +30,18 @@ create_err_msg(Conf *config) {
 
         ERR_print_errors(config->handle->configuration->log);
         (void)BIO_flush(config->handle->configuration->log);
-        BIO_get_mem_data(config->handle->configuration->log, &tmp);
-        if (tmp) {
-            memset(error, 0, 4096);
-            strncpy(error, tmp, 4095);
+
+        /* read log data if we were logging to memory
+           i.e.: if there is a BIO_TYPE_MEM somewhere in the BIO chain */
+        if (BIO_find_type(config->handle->configuration->log, BIO_TYPE_MEM) != NULL) {
+            BIO_get_mem_data(config->handle->configuration->log, &tmp);
+            if (tmp) {
+                memset(error, 0, 4096);
+                strncpy(error, tmp, 4095);
+            }
         }
 
-        if(config->cleanup) {
+        if (config->cleanup) {
             BIO_free(config->handle->configuration->log);
             scep_cleanup(config->handle);
         }
