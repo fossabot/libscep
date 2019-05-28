@@ -20,13 +20,13 @@ create_err_msg(Conf *config) {
 
     if(config) {
         if (! config->handle)
-          Perl_croak(aTHX_ "*** Internal error: missing config handle");
+          Perl_croak(aTHX_ "*** Internal error: missing member (SCEP*)handle in 'config'");
 
         if (! config->handle->configuration)
-          Perl_croak(aTHX_ "*** Internal error: missing config handle configuration");
+          Perl_croak(aTHX_ "*** Internal error: missing member (SCEP_CONFIGURATION*)configuration in config->handle");
 
         if (! config->handle->configuration->log)
-          Perl_croak(aTHX_ "*** Internal error: missing config log BIO");
+          Perl_croak(aTHX_ "*** Internal error: missing member (BIO*)log in config->handle->configuration");
 
         ERR_print_errors(config->handle->configuration->log);
         (void)BIO_flush(config->handle->configuration->log);
