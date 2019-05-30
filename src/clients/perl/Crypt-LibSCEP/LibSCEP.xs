@@ -674,6 +674,7 @@ CODE:
         EVP_PKEY_free(sig_key);
         PKCS7_free(pkcsreq);
         BIO_free(b);
+        SCEP_DATA_free(unwrapped);
         if (success)
             cleanup_config(config);
         else
@@ -754,6 +755,7 @@ CODE:
         PKCS7_free(pkcsreq);
         X509_free(sig_cert);
         BIO_free(b);
+        SCEP_DATA_free(unwrapped);
         if (success)
             cleanup_config(config);
         else
@@ -943,6 +945,7 @@ CODE:
         X509_free(sig_cert);
         PKCS7_free(pkcsreq);
         BIO_free(b);
+        SCEP_DATA_free(unwrapped);
         if (success)
             cleanup_config(config);
         else
@@ -1768,6 +1771,7 @@ CODE:
         PKCS7_free(getcrl);
         X509_CRL_free(crl);
         BIO_free(b);
+        SCEP_DATA_free(unwrapped);
         if (success)
             cleanup_config(config);
         else
