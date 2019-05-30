@@ -37,15 +37,21 @@ SCEP_ERROR scep_init(SCEP **handle)
 
 void scep_cleanup(SCEP *handle)
 {
-	scep_conf_free(handle->configuration);
+	scep_conf_free(handle->configuration); // calls ENGINE_cleanup();
 	_scep_handle_count -= 1;
 	// globally run once
 	if(_scep_handle_count == 0) {
 		free(_scep_oids);
 		_scep_oids = NULL;
-		EVP_cleanup();
-		ERR_free_strings();
-		OBJ_cleanup();
+		// https://wiki.openssl.org/index.php/Library_Initialization#Cleanup
+		CONF_modules_unload(1);         // all modules, including builtin modules will be unloaded
+		EVP_cleanup();                  // removes all digests and ciphers
+		CRYPTO_cleanup_all_ex_data();   // needed if BIOs were used
+#if OPENSSL_VERSION_NUMBER < 0x10000000L
+		ERR_remove_state();
+#endif
+		ERR_free_strings();             // free all previously loaded error strings (no-op in OpenSSL > v1.1.0)
+		OBJ_cleanup();                  // clean up OpenSSLs internal object table (if OBJ_create was called)
 	}
 	free(handle);
 }
