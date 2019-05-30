@@ -565,7 +565,6 @@ CODE:
 
     success = TRUE;
     err:
-        sk_X509_INFO_pop_free(X509Infos, X509_INFO_free);
         sk_X509_pop_free(certs, X509_free);
         X509_free(sig_cert);
         X509_free(enc_cert);
@@ -652,10 +651,10 @@ CODE:
             X509Info->x509 = NULL;
         }
     }
-
+    sk_X509_INFO_pop_free(X509Infos, X509_INFO_free);
 
     s = scep_certrep(config->handle, unwrapped->transactionID, unwrapped->senderNonce, SCEP_SUCCESS, 0, issuedCert, sig_cert, sig_key, enc_cert, certs, NULL, &p7);
-    if(s != SCEPE_OK  || p7 == NULL){
+    if(s != SCEPE_OK || p7 == NULL) {
         scep_log(config->handle, ERROR, "scep_certrep failed");
         goto err;
     }
@@ -669,7 +668,6 @@ CODE:
 
     success = TRUE;
     err:
-        sk_X509_INFO_pop_free(X509Infos, X509_INFO_free);
         sk_X509_pop_free(certs, X509_free);
         X509_free(sig_cert);
         X509_free(issuedCert);
@@ -1460,7 +1458,6 @@ CODE:
     success = TRUE;
 
     err:
-        sk_X509_INFO_pop_free(X509Infos, X509_INFO_free);
         EVP_PKEY_free(sig_key);
         sk_X509_pop_free(certs, X509_free);
         X509_free(sig_cert);
