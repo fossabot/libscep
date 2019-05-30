@@ -85,6 +85,7 @@ cleanup_and_croak:
     Perl_croak(aTHX_ error);
 }
 
+
 SV*
 bio2str(BIO *b) {
     char *tmp = NULL;
@@ -290,6 +291,7 @@ load_engine(SV *rv_engine_conf, Conf *config) {
         create_err_msg(config, NULL);
 }
 
+
 EVP_PKEY *load_key(char *key_str, Conf *config) {
     EVP_PKEY *key = NULL;
     BIO *b = NULL;
@@ -353,6 +355,7 @@ EVP_PKEY *load_key(char *key_str, Conf *config) {
     return NULL;
 }
 
+
 X509_CRL *
 str2crl (Conf *config, char *str, BIO *b) {
     X509_CRL *c = NULL;
@@ -376,6 +379,7 @@ str2crl (Conf *config, char *str, BIO *b) {
     (void)BIO_reset(b);
     return c;
 }
+
 
 X509_REQ *
 str2req (Conf *config, char *str, BIO *b) {
@@ -436,6 +440,7 @@ str2cert (Conf *config, char *str, BIO *b) {
     return c;
 }
 
+
 PKCS7 *
 str2pkcs7 (Conf *config, char *str, BIO *b) {
     PKCS7 *c = NULL;
@@ -459,6 +464,7 @@ str2pkcs7 (Conf *config, char *str, BIO *b) {
     (void)BIO_reset(b);
     return c;
 }
+
 
 STACK_OF(X509_INFO) *
 str2x509infos (Conf *config, char *str, BIO *b) {
@@ -499,36 +505,26 @@ char * enc_cert_str
 char * transID
 unsigned char * senderNonce
 PREINIT:
-    Conf *config;
-    BIO *b;
-    EVP_PKEY *sig_key;
-    X509 *sig_cert;
-    X509 *issuedCert;
-    PKCS7 *p7;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    EVP_PKEY *sig_key = NULL;
+    X509 *sig_cert = NULL;
+    X509 *issuedCert = NULL;
+    PKCS7 *p7 = NULL;
     int i;
-    STACK_OF(X509) *certs;
-    STACK_OF(X509_INFO) *X509Infos;
-    X509_INFO *X509Info;
-    X509 *enc_cert;
-    SV *reply;
+    STACK_OF(X509) *certs = NULL;
+    STACK_OF(X509_INFO) *X509Infos = NULL;
+    X509_INFO *X509Info = NULL;
+    X509 *enc_cert = NULL;
+    SV *reply = NULL;
     SCEP_ERROR s;
-    bool success;
+    bool success = FALSE;
 CODE:
-    sig_key = NULL;
-    sig_cert  = NULL;
-    p7 = NULL;
-    issuedCert = NULL;
     certs = sk_X509_new_null();
-    X509Infos = NULL;
-    enc_cert = NULL;
-    reply = NULL;
-    success = FALSE;
-
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-
     sig_key = load_key(sig_key_str, config);
-    b = BIO_new(BIO_s_mem());
 
+    b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
         create_err_msg(config, NULL);
@@ -585,6 +581,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 create_certificate_reply(rv_config, sig_key_str, sig_cert_str, pkcsreq_str, chain_str)
 SV * rv_config
@@ -593,32 +590,26 @@ char * sig_cert_str
 char * pkcsreq_str
 char * chain_str
 PREINIT:
-    Conf *config;
-    BIO *b;
-    PKCS7 *p7;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    PKCS7 *p7 = NULL;
     int i;
-    STACK_OF(X509) *certs;
-    STACK_OF(X509_INFO) *X509Infos;
-    X509_INFO *X509Info;
-    SV *reply;
-    bool success;
-    EVP_PKEY *sig_key;
-    X509 *sig_cert;
-    PKCS7 *pkcsreq;
-    X509 *issuedCert;
-    X509 *enc_cert;
+    STACK_OF(X509) *certs = NULL;
+    STACK_OF(X509_INFO) *X509Infos = NULL;
+    X509_INFO *X509Info = NULL;
+    SV *reply = NULL;
+    bool success = FALSE;
+    EVP_PKEY *sig_key = NULL;
+    X509 *sig_cert = NULL;
+    PKCS7 *pkcsreq = NULL;
+    X509 *issuedCert = NULL;
+    X509 *enc_cert = NULL;
     SCEP_ERROR s;
-    SCEP_DATA *unwrapped;
+    SCEP_DATA *unwrapped = NULL;
 CODE:
-    success = FALSE;
-    p7 = NULL;
-    issuedCert = NULL;
     certs = sk_X509_new_null();
-    X509Infos = NULL;
-    reply = NULL;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
     sig_key = load_key(sig_key_str, config);
-    unwrapped = NULL;
 
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
@@ -693,6 +684,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 create_error_reply(rv_config, sig_key_str, sig_cert_str, pkcsreq_str, failInfo_str)
 SV   * rv_config
@@ -701,32 +693,27 @@ char * sig_cert_str
 char * pkcsreq_str
 char * failInfo_str
 PREINIT:
-    Conf *config;
-    BIO *b;
-    PKCS7 *p7;
-    SV *reply;
-    EVP_PKEY *sig_key;
-    bool success;
-    X509 *sig_cert;
-    PKCS7 *pkcsreq;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    PKCS7 *p7 = NULL;
+    SV *reply = NULL;
+    EVP_PKEY *sig_key = NULL;
+    bool success = FALSE;
+    X509 *sig_cert = NULL;
+    PKCS7 *pkcsreq = NULL;
     SCEP_ERROR s;
-    SCEP_DATA *unwrapped;
-    SCEP_FAILINFO failInfo;
+    SCEP_DATA *unwrapped = NULL;
+    SCEP_FAILINFO failInfo = 0;
 CODE:
-    success = FALSE;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-    p7 = NULL;
-    reply = NULL;
-
     sig_key = load_key(sig_key_str, config);
-    unwrapped = NULL;
-    failInfo = 0;
 
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
         create_err_msg(config, NULL);
     }
+
     sig_cert = str2cert (config, sig_cert_str, b);
     pkcsreq = str2pkcs7(config, pkcsreq_str, b);
 
@@ -777,6 +764,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 create_error_reply_wop7(rv_config, sig_key_str, sig_cert_str, transID, senderNonce, failInfo_str)
 SV   * rv_config
@@ -786,22 +774,18 @@ char * transID
 unsigned char *senderNonce
 char * failInfo_str
 PREINIT:
-    Conf *config;
-    BIO *b;
-    PKCS7 *p7;
-    EVP_PKEY *sig_key;
-    SV *reply;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    PKCS7 *p7 = NULL;
+    EVP_PKEY *sig_key = NULL;
+    SV *reply = NULL;
     SCEP_ERROR s;
-    bool success;
-    X509 *sig_cert;
-    SCEP_FAILINFO failInfo;
+    bool success = FALSE;
+    X509 *sig_cert = NULL;
+    SCEP_FAILINFO failInfo = 0;
 CODE:
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-    p7 = NULL;
-    reply = NULL;
-    failInfo = 0;
     sig_key = load_key(sig_key_str, config);
-    success = FALSE;
 
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
@@ -851,6 +835,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 create_pending_reply_wop7(rv_config, sig_key_str, sig_cert_str, transID, senderNonce)
 SV   * rv_config
@@ -859,20 +844,17 @@ char * sig_cert_str
 char * transID
 unsigned char * senderNonce
 PREINIT:
-    Conf *config;
-    BIO *b;
-    PKCS7 *p7;
-    EVP_PKEY *sig_key;
-    SV *reply;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    PKCS7 *p7 = NULL;
+    EVP_PKEY *sig_key = NULL;
+    SV *reply = NULL;
     SCEP_ERROR s;
-    bool success;
-    X509 *sig_cert;
+    bool success = FALSE;
+    X509 *sig_cert = NULL;
 CODE:
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-    p7 = NULL;
-    reply = NULL;
     sig_key = load_key(sig_key_str, config);
-    success = FALSE;
 
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
@@ -916,22 +898,18 @@ char * sig_key_str
 char * sig_cert_str
 char * pkcsreq_str
 PREINIT:
-    Conf *config;
-    BIO *b;
-    PKCS7 *p7;
-    EVP_PKEY *sig_key;
-    SV *reply;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    PKCS7 *p7 = NULL;
+    EVP_PKEY *sig_key = NULL;
+    SV *reply = NULL;
     SCEP_ERROR s;
-    bool success;
-    X509 *sig_cert;
-    PKCS7 *pkcsreq;
-    SCEP_DATA *unwrapped;
+    bool success = FALSE;
+    X509 *sig_cert = NULL;
+    PKCS7 *pkcsreq = NULL;
+    SCEP_DATA *unwrapped = NULL;
 CODE:
-    success = FALSE;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-    p7 = NULL;
-    reply = NULL;
-    unwrapped = NULL;
     sig_key = load_key(sig_key_str, config);
 
     b = BIO_new(BIO_s_mem());
@@ -975,6 +953,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 pkcsreq(rv_config, sig_key_str, sig_cert_str, enc_cert_str, req_str)
 SV   * rv_config
@@ -983,21 +962,20 @@ char * enc_cert_str
 char * sig_key_str
 char * req_str
 PREINIT:
-    Conf *config;
-    BIO *b;
-    PKCS7 *p7;
-    EVP_PKEY *sig_key;
-    SV *reply;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    PKCS7 *p7 = NULL;
+    EVP_PKEY *sig_key = NULL;
+    SV *reply = NULL;
     SCEP_ERROR s;
-    bool success;
-    X509 *sig_cert;
-    X509_REQ *req;
-    X509 *enc_cert;
+    bool success = FALSE;
+    X509 *sig_cert = NULL;
+    X509_REQ *req = NULL;
+    X509 *enc_cert = NULL;
 CODE:
-    success = FALSE;
-    reply = NULL;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
     sig_key = load_key(sig_key_str, config);
+
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
@@ -1036,6 +1014,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 getcert(rv_config, sig_key_str, sig_cert_str, enc_cert_str, cacert_str, serial_str)
 SV   * rv_config
@@ -1045,23 +1024,20 @@ char * enc_cert_str
 char * cacert_str
 char * serial_str
 PREINIT:
-    Conf *config;
-    BIO *b;
-    PKCS7 *p7;
-    SV *reply;
-    EVP_PKEY *sig_key;
-    bool success;
-    X509 *sig_cert;
-    X509 *enc_cert;
-    X509 *cacert;
-    ASN1_INTEGER *serial;
-    X509_NAME *issuer;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    PKCS7 *p7 = NULL;
+    SV *reply = NULL;
+    EVP_PKEY *sig_key = NULL;
+    bool success = FALSE;
+    X509 *sig_cert = NULL;
+    X509 *enc_cert = NULL;
+    X509 *cacert = NULL;
+    ASN1_INTEGER *serial = NULL;
+    X509_NAME *issuer = NULL;
     SCEP_ERROR s;
 CODE:
-    success = FALSE;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-    p7 = NULL;
-    reply = NULL;
     sig_key = load_key(sig_key_str, config);
 
     b = BIO_new(BIO_s_mem());
@@ -1117,6 +1093,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 char *
 get_message_type(pkiMessage)
 Crypt::LibSCEP pkiMessage
@@ -1135,21 +1112,20 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 Crypt::LibSCEP
 parse(rv_config, pkiMessage_str)
-SV   *rv_config
+SV   * rv_config
 char * pkiMessage_str
 PREINIT:
-    BIO *b;
+    BIO *b = NULL;
     SCEP_ERROR s;
-    Conf *config;
-    PKCS7 *pkiMessage;
-    SCEP_DATA *unwrapped;
-    bool success;
+    Conf *config = NULL;
+    PKCS7 *pkiMessage = NULL;
+    SCEP_DATA *unwrapped = NULL;
+    bool success = FALSE;
 CODE:
-    success = FALSE;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-    unwrapped = NULL;
     Newx(RETVAL, 1, SCEP_DATA);
 
     b = BIO_new(BIO_s_mem());
@@ -1178,6 +1154,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 Crypt::LibSCEP
 unwrap(rv_config, pkiMessage_str, sig_cert_str, enc_cert_str, enc_key_str)
 SV   * rv_config
@@ -1186,20 +1163,18 @@ char * sig_cert_str
 char * enc_cert_str
 char * enc_key_str
 PREINIT:
-    Conf *config;
-    BIO *b;
+    Conf *config = NULL;
+    BIO *b = NULL;
     SCEP_ERROR s;
-    PKCS7 *pkiMessage;
-    SCEP_DATA *unwrapped;
-    bool success;
-    EVP_PKEY *enc_key;
-    X509 *sig_cert;
-    X509 *enc_cert;
+    PKCS7 *pkiMessage = NULL;
+    SCEP_DATA *unwrapped = NULL;
+    bool success = FALSE;
+    EVP_PKEY *enc_key = NULL;
+    X509 *sig_cert = NULL;
+    X509 *enc_cert = NULL;
 CODE:
-    success = FALSE;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
     enc_key = load_key(enc_key_str, config);
-    unwrapped = NULL;
 
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
@@ -1235,16 +1210,18 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 void
 create_engine(rv_config, rv_engine_conf)
 SV * rv_config
 SV * rv_engine_conf
 PREINIT:
-    Conf *config;
+    Conf *config = NULL;
 CODE:
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
     load_engine(rv_engine_conf, config);
     cleanup_config(config);
+
 
 SV *
 get_transaction_id(pkiMessage)
@@ -1254,11 +1231,12 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 get_failInfo(pkiMessage)
     Crypt::LibSCEP pkiMessage
 PREINIT:
-    char *ret;
+    char *ret = NULL;
 CODE:
     ret = "";
     switch(pkiMessage->failInfo) {
@@ -1282,11 +1260,12 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 get_pkiStatus(pkiMessage)
     Crypt::LibSCEP pkiMessage
 PREINIT:
-    char *ret;
+    char *ret = NULL;
 CODE:
     ret = "";
     switch(pkiMessage->pkiStatus) {
@@ -1309,7 +1288,7 @@ SV *
 get_issuer(pkiMessage)
     Crypt::LibSCEP pkiMessage
 PREINIT:
-    char *ret;
+    char *ret = NULL;
 CODE:
     ret = "";
     if(pkiMessage->issuer_and_serial != NULL) {
@@ -1328,7 +1307,7 @@ SV *
 get_subject(pkiMessage)
     Crypt::LibSCEP pkiMessage
 PREINIT:
-    char *ret;
+    char *ret = NULL;
 CODE:
     if(pkiMessage->issuer_and_subject != NULL) {
         ret = X509_NAME_oneline(pkiMessage->issuer_and_subject->subject, NULL, 0);
@@ -1343,9 +1322,9 @@ SV *
 get_crl(pkiMessage)
     Crypt::LibSCEP pkiMessage
 PREINIT:
-    STACK_OF(X509_CRL) *crls;
-    X509_CRL *crl;
-    BIO *b;
+    STACK_OF(X509_CRL) *crls = NULL;
+    X509_CRL *crl = NULL;
+    BIO *b = NULL;
 CODE:
     if (pkiMessage && pkiMessage->messageData && pkiMessage->messageData->d.sign && pkiMessage->messageData->d.sign->crl) {
         crls = pkiMessage->messageData->d.sign->crl;
@@ -1366,16 +1345,16 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 get_cert(pkiMessage)
     Crypt::LibSCEP pkiMessage
 PREINIT:
-    STACK_OF(X509) *certs;
-    SV *reply;
-    BIO *b;
+    STACK_OF(X509) *certs = NULL;
+    SV *reply = NULL;
+    BIO *b = NULL;
     int i;
 CODE:
-    reply = NULL;
     if (pkiMessage && pkiMessage->messageData && pkiMessage->messageData->d.sign && pkiMessage->messageData->d.sign->cert) {
         certs = pkiMessage->messageData->d.sign->cert;
         b = BIO_new(BIO_s_mem());
@@ -1392,7 +1371,6 @@ CODE:
     }
 OUTPUT:
     RETVAL
-
 
 
 SV*
@@ -1417,6 +1395,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 create_nextca_reply(rv_config, chain_str, sig_cert_str, sig_key_str)
 SV   * rv_config
@@ -1424,24 +1403,21 @@ char * chain_str
 char * sig_cert_str
 char * sig_key_str
 PREINIT:
-    Conf *config;
-    SV *reply;
-    BIO *b;
-    EVP_PKEY *sig_key;
-    X509 *sig_cert;
+    Conf *config = NULL;
+    SV *reply = NULL;
+    BIO *b = NULL;
+    EVP_PKEY *sig_key = NULL;
+    X509 *sig_cert = NULL;
     int i;
-    STACK_OF(X509) *certs;
-    STACK_OF(X509_INFO) *X509Infos;
-    X509_INFO *X509Info;
-    PKCS7 *p7;
-    bool success;
+    STACK_OF(X509) *certs = NULL;
+    STACK_OF(X509_INFO) *X509Infos = NULL;
+    X509_INFO *X509Info = NULL;
+    PKCS7 *p7 = NULL;
+    bool success = FALSE;
 CODE:
-    success = FALSE;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-    reply = NULL;
     certs = sk_X509_new_null();
-    X509Infos = NULL;
-    p7 = NULL;
+
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         scep_log(config->handle, ERROR, "Memory allocation error");
@@ -1498,11 +1474,12 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 get_getcert_serial(pkiMessage)
     Crypt::LibSCEP pkiMessage
 PREINIT:
-    char *ret;
+    char *ret = NULL;
 CODE:
     ret = "";
     if(pkiMessage->issuer_and_serial != NULL) {
@@ -1512,20 +1489,22 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 get_signer_cert(pkiMessage)
     Crypt::LibSCEP pkiMessage
   PREINIT:
-    X509 *cert;
-    SV *reply;
-    BIO *b;
+    X509 *cert = NULL;
+    SV *reply = NULL;
+    BIO *b = NULL;
 CODE:
     cert = pkiMessage->signer_certificate;
-    reply = NULL;
+
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         Perl_croak(aTHX_ "Memory allocation error");
     }
+
     if(PEM_write_bio_X509(b, cert)) {
         reply = bio2str(b);
         RETVAL = reply;
@@ -1534,24 +1513,26 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 get_pkcs10(pkiMessage)
     Crypt::LibSCEP pkiMessage
 PREINIT:
-    X509_REQ * req;
-    SV *reply;
-    BIO *b;
+    X509_REQ * req = NULL;
+    SV *reply = NULL;
+    BIO *b = NULL;
 CODE:
-        if (! pkiMessage)
+    if (! pkiMessage)
       Perl_croak(aTHX_ "Internal error: no pkiMessage");
-        if (! pkiMessage->request)
+    if (! pkiMessage->request)
       Perl_croak(aTHX_ "Internal error: no request in pkiMessage");
     req = pkiMessage->request;
-    reply = NULL;
+
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
         Perl_croak(aTHX_ "Memory allocation error");
     }
+
     if(PEM_write_bio_X509_REQ(b, req)) {
         reply = bio2str(b);
         RETVAL = reply;
@@ -1560,11 +1541,12 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 Handle
 create_handle(rv_config)
 SV * rv_config
 PREINIT:
-    Conf *config;
+    Conf *config = NULL;
 CODE:
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
     Newx(RETVAL, 1, SCEP);
@@ -1573,15 +1555,15 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 void
 cleanup(rv_handle)
 SV * rv_handle
 PREINIT:
-    SCEP *handle;
+    SCEP *handle = NULL;
     size_t s;
-    SV *sv;
+    SV *sv = NULL;
 CODE:
-    handle = NULL;
     if(SvROK(rv_handle)) {
         sv = SvRV(rv_handle);
         s = SvIV(sv);
@@ -1594,6 +1576,7 @@ CODE:
         scep_cleanup(handle);
     }
 
+
 SV *
 getcertinitial(rv_config, sig_key_str, sig_cert_str, enc_cert_str, req_str, issuer_cert_str)
 SV   * rv_config
@@ -1603,22 +1586,19 @@ char * sig_key_str
 char * req_str
 char * issuer_cert_str
 PREINIT:
-    Conf *config;
-    BIO *b;
-    PKCS7 *p7;
-    EVP_PKEY *sig_key;
-    SV *reply;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    PKCS7 *p7 = NULL;
+    EVP_PKEY *sig_key = NULL;
+    SV *reply = NULL;
     SCEP_ERROR s;
-    bool success;
-    X509 *sig_cert;
-    X509_REQ *req;
-    X509 *enc_cert;
-    X509 *issuer_cert;
+    bool success = FALSE;
+    X509 *sig_cert = NULL;
+    X509_REQ *req = NULL;
+    X509 *enc_cert = NULL;
+    X509 *issuer_cert = NULL;
 CODE:
-    success = FALSE;
-    reply = NULL;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-    p7 = NULL;
     sig_key = load_key(sig_key_str, config);
 
     b = BIO_new(BIO_s_mem());
@@ -1661,6 +1641,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 getcrl(rv_config, sig_key_str, sig_cert_str, enc_cert_str, validate_cert_str)
 SV   * rv_config
@@ -1669,21 +1650,18 @@ char * enc_cert_str
 char * validate_cert_str
 char * sig_key_str
 PREINIT:
-    Conf *config;
-    BIO *b;
-    PKCS7 *p7;
-    EVP_PKEY *sig_key;
-    SV *reply;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    PKCS7 *p7 = NULL;
+    EVP_PKEY *sig_key = NULL;
+    SV *reply = NULL;
     SCEP_ERROR s;
-    bool success;
-    X509 *sig_cert;
-    X509 *enc_cert;
-    X509 *validate_cert;
+    bool success = FALSE;
+    X509 *sig_cert = NULL;
+    X509 *enc_cert = NULL;
+    X509 *validate_cert = NULL;
 CODE:
-    success = FALSE;
-    reply = NULL;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-    p7 = NULL;
     sig_key = load_key(sig_key_str, config);
 
     b = BIO_new(BIO_s_mem());
@@ -1724,6 +1702,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 create_crl_reply(rv_config, sig_key_str, sig_cert_str, getcrl_str, crl_str)
 SV * rv_config
@@ -1732,27 +1711,21 @@ char * sig_cert_str
 char * getcrl_str
 char * crl_str
 PREINIT:
-    Conf *config;
-    BIO *b;
-    PKCS7 *p7;
-    SV *reply;
-    bool success;
-    EVP_PKEY *sig_key;
-    X509 *sig_cert;
-    PKCS7 *getcrl;
-    X509 *enc_cert;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    PKCS7 *p7 = NULL;
+    SV *reply = NULL;
+    bool success = FALSE;
+    EVP_PKEY *sig_key = NULL;
+    X509 *sig_cert = NULL;
+    PKCS7 *getcrl = NULL;
+    X509 *enc_cert = NULL;
     SCEP_ERROR s;
-    SCEP_DATA *unwrapped;
-    X509_CRL *crl;
+    SCEP_DATA *unwrapped = NULL;
+    X509_CRL *crl = NULL;
 CODE:
-    success = FALSE;
-    p7 = NULL;
-    crl = NULL;
-
-    reply = NULL;
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
     sig_key = load_key(sig_key_str, config);
-    unwrapped = NULL;
 
     b = BIO_new(BIO_s_mem());
     if(b == NULL) {
@@ -1806,6 +1779,7 @@ CODE:
 OUTPUT:
     RETVAL
 
+
 SV *
 create_crl_reply_wop7(rv_config, sig_key_str, sig_cert_str, transID, senderNonce, enc_cert_str, crl_str)
 SV * rv_config
@@ -1816,27 +1790,18 @@ char * enc_cert_str
 char * transID
 unsigned char * senderNonce
 PREINIT:
-    Conf *config;
-    BIO *b;
-    EVP_PKEY *sig_key;
-    X509 *sig_cert;
-    PKCS7 *p7;
-    X509_CRL *crl;
-    X509 *enc_cert;
-    SV *reply;
+    Conf *config = NULL;
+    BIO *b = NULL;
+    EVP_PKEY *sig_key = NULL;
+    X509 *sig_cert = NULL;
+    PKCS7 *p7 = NULL;
+    X509_CRL *crl = NULL;
+    X509 *enc_cert = NULL;
+    SV *reply = NULL;
     SCEP_ERROR s;
-    bool success;
+    bool success = FALSE;
 CODE:
-    sig_key = NULL;
-    sig_cert  = NULL;
-    p7 = NULL;
-    crl = NULL;
-    enc_cert = NULL;
-    reply = NULL;
-    success = FALSE;
-
     config = INT2PTR(Conf *, PTR2IV(init_config(rv_config)));
-
     sig_key = load_key(sig_key_str, config);
 
     b = BIO_new(BIO_s_mem());
@@ -1877,6 +1842,7 @@ CODE:
     RETVAL = reply;
 OUTPUT:
     RETVAL
+
 
 void
 DESTROY(result)
