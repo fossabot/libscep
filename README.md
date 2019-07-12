@@ -1,6 +1,7 @@
 libscep - A Client Side SCEP Library
 ====================================
 [![Build Status](https://travis-ci.org/Javex/libscep.svg?branch=develop)](https://travis-ci.org/Javex/libscep)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fmaxhq%2Flibscep.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fmaxhq%2Flibscep?ref=badge_shield)
 
 `libscep` implements the 
 [SCEP protocol](http://tools.ietf.org/html/draft-nourse-scep-23) as a C library
@@ -53,3 +54,7 @@ The resulting debian package files will be copied to the current directory.
 NOTE: The current support for building packages is proof-of-concept. The
 package versions must be set manually in the debian/\* files.
 
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fmaxhq%2Flibscep.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fmaxhq%2Flibscep?ref=badge_large)
